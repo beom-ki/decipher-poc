@@ -102,7 +102,6 @@ contract DutchAuction {
     }
 
     function cancelAuction(uint16 index) public returns (bool) {
-        require(isLeadMembers(msg.sender));
         Auction storage auction = auctions[epoch][index];
         auction.isValid = false;
         return true;
