@@ -103,7 +103,10 @@ contract DutchAuction {
 
     function cancelAuction(uint16 index) public returns (bool) {
         Auction storage auction = auctions[epoch][index];
+        require(isLeadMembers(msg.sender) || msg.sender == auction.seller);
         auction.isValid = false;
+        tokenVault[epoch][auction.seller] -= auction.value;
+        token.transfer(auction.seller, auction.value);
         return true;
     }
 }
