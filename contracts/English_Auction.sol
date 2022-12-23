@@ -25,15 +25,18 @@ contract EnglishAuction {
         uint durationBlockNumber
     );
 
+    struct Bid{
+        address bidder;
+        uint price;
+    }
+
     event BidCreated(
         address bidder,
         uint price
     );
 
     mapping(uint => mapping(uint16 => Auction)) private auctions; // key : epoch
-    mapping(uint => mapping(uint16 => mapping(address => uint))) private bids; // epoch => auction_index => address => bidPrice
-    mapping(uint => mapping(uint16 => mapping(uint => address))) private reverse_bids;
-    mapping(uint => mapping(uint16 => uint[])) private bids_arr;
+    mapping(uint => mapping(uint16 => Bid[])) private bids; // epoch => auction_index => array of Bid
     mapping (uint => mapping(address => uint)) private tokenVault;
 
     function isLeadMembers(address adrs) public view returns (bool) {
@@ -68,31 +71,26 @@ contract EnglishAuction {
         emit AuctionCreated(auctionOwner, value, durationBlockNumber);
         return true;
     }
-    
-    function bid(uint16 index) public payable returns (bool) {
-        Auction storage auction = auctions[epoch][index];
-        mapping(address => uint) storage auction_bids = bids[epoch][index];
-        uint[] storage auction_bids_arr = bids_arr[epoch][index];
-        for (uint i=0; i<auction_bids_arr.length; i++){
-            require(msg.value != auction_bids_arr[i], "Bid at same price already exists");
-        }
-        uint prev_bid = auction_bids[msg.sender];
-        auction_bids[msg.sender] = msg.value;
-        
-        reverse_bids[epoch][index][msg.value] = msg.sender;
-        if (prev_bid == 0){
-            // first bid
-            auction_bids_arr.push(msg.value);
-        } else {
-            // change pre-existed bid
-            delete reverse_bids[epoch][index][prev_bid];
-            for (uint i=0; i<auction_bids_arr.length; i++){
-                if (auction_bids_arr[i] == prev_bid) {
-                    auction_bids_arr[i] = msg.value;
-                    break;
-                }
+
+    function checkAlreadyBid(address adr, uint16 index) public view returns (bool, uint) {
+        Bid[] storage auction_bids = bids[epoch][index];
+        for (uint i=0; i < auction_bids.length; i++){
+            if(adr == auction_bids[i].bidder) {
+                return (true, i);
             }
         }
+        return (false, 0);
+    }
+
+    function bid(uint16 index) public payable returns (bool) {
+        bool check;
+        (check, ) = checkAlreadyBid(msg.sender, index);
+        require(!check, "You already have previous bid, Please modify your order");
+
+        Auction storage auction = auctions[epoch][index];
+        Bid[] storage auction_bids = bids[epoch][index];
+
+        auction_bids.push(Bid(msg.sender, msg.value));
         
         if (msg.value > auction.highestBid) {
             auction.highestBid = msg.value;
@@ -102,44 +100,38 @@ contract EnglishAuction {
     }
 
     function cancelBid(uint16 index) public returns (bool) {
+        bool check;
+        uint idx;
+        (check, idx) = checkAlreadyBid(msg.sender, index);
+        require(check, "You haven't bidded before");
+
         Auction storage auction = auctions[epoch][index];
-        mapping(address => uint) storage auction_bids = bids[epoch][index];
-        uint[] storage auction_bids_arr = bids_arr[epoch][index];
-        require(auction_bids[msg.sender] > 0);
+        Bid[] storage auction_bids = bids[epoch][index];
 
-        mapping(uint => address) storage auction_reverse_bids = reverse_bids[epoch][index];
-        uint delete_idx;
-
-        if (auction_bids[msg.sender] == auction.highestBid) {
+        delete auction_bids[idx];
+        if (auction_bids[idx].price == auction.highestBid) {
             // need to update highestBid (hardest part)
             uint secondHighestBid = 0;
             address secondHighestBidder = address(this);
             
-            for (uint i=0; i < auction_bids_arr.length; i++) {
-                if (auction_bids_arr[i] == auction.highestBid) {
-                    delete_idx = i;
-                    delete auction_reverse_bids[auction.highestBid];
-                    continue;
-                }
-                if (secondHighestBid < auction_bids_arr[i]) {
-                    secondHighestBid = auction_bids_arr[i];
-                    secondHighestBidder = auction_reverse_bids[auction_bids_arr[i]];
+            for (uint i=0; i < auction_bids.length; i++) {
+                if (secondHighestBid < auction_bids[i].price) {
+                    secondHighestBid = auction_bids[i].price;
+                    secondHighestBidder = auction_bids[i].bidder;
                 }
             }
+        } 
+        return true;
+    }
 
-            delete auction_bids_arr[delete_idx]; // maybe should delete outside of loop to prevent from length changing
-            delete auction_bids[msg.sender];
-        } else {
-            // only need to delete data
-            delete auction_reverse_bids[auction_bids[msg.sender]];
-            for (uint i=0; i < auction_bids_arr.length; i++) {
-                if (auction_bids_arr[i] == auction_bids[msg.sender]) {
-                    delete auction_bids_arr[i];
-                    delete auction_bids[msg.sender];
-                    break;
-                }
-            }
-        }
+    function modifyBid(uint16 index) public payable returns (bool) {
+        bool check;
+        uint idx;
+        (check, idx) = checkAlreadyBid(msg.sender, index);
+        require(check, "Please use new bid");
+
+        cancelBid(index);
+        bid(index);
 
         return true;
     }
