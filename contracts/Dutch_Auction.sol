@@ -69,6 +69,7 @@ contract DutchAuction {
 
         startPrice += _auctions[currentId - 1].currentPrice * 3; // 저번 팔린 가격 참고해서 startPrice 증가.
 
+        token.approve(address(this), 5); // 최대 5개 팔 수 있음. -> 여기서 approve 해줘야 transferFrom 사용가능
         Auction memory new_auction = Auction(currentId, msg.sender, quantity, startPrice, block.number, false);
         _auctions.push(new_auction);
         emit AuctionCreated(currentId, msg.sender, quantity, block.number);
@@ -110,7 +111,7 @@ contract DutchAuction {
         payable(auction.seller).transfer(auction.currentPrice);
 
         // approve 를 auction contract 에만 해줘야 한다.
-        IERC20(token).transferFrom(
+        token.transferFrom(
             auction.seller,
             msg.sender,
             auction.quantity
