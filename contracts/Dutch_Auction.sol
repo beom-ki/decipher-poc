@@ -3,110 +3,138 @@ pragma solidity >= 0.8.0;
 
 import "./POC.sol";
 import "@openzeppelin/contracts/utils/math/SafeMath.sol";
+import "@openzeppelin/contracts/utils/Counters.sol";
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 contract DutchAuction {
     using SafeMath for uint;
+    using Counters for Counters.Counter;
     POC token;
-    uint16 auctionIndex = 0;
-    uint epoch = token.epoch();
-    address[] private auctionLeadMembers = [0x48B523E7910298a0D9FC1eE0fA06A639e58b4eCF];
+    uint public startPrice = 1e18; // 1eth
+    uint public minimumPrice = 1e16; // 0.01eth
+
 
     struct Auction {
+        uint index;
         address seller;
-        uint16 value;
-        uint startPrice;
+        uint quantity;
         uint currentPrice;
-        uint updatePrice;
         uint createdBlockNumber;
-        bool isValid;
+        bool isSold;
     }
 
+    // 시작 가격과 최소 가격 지금은 항상 고정. 수요에 따라 바꿀 수 있게 자동으로 식 구성해도 되겠다.
+    // 수명은 항상 총 24시간 -> block number 로 바꾸면 대강 (1분에 5블록) = 7200블록
     event AuctionCreated(
+        uint id,
         address seller,
-        uint16 value,
-        uint startPrice,
-        uint updatePrice,
+        uint quantity,
         uint createdBlockNumber
     );
 
-    mapping(uint => mapping(uint16 => Auction)) private auctions; // key : epoch
-    mapping (uint => mapping(address => uint)) private tokenVault;
+    event AuctionSold(
+        uint id,
+        address seller,
+        address buyer,
+        uint quantity,
+        uint price,
+        uint duration
+    );
 
-    function isLeadMembers(address adrs) public view returns (bool) {
-        for (uint i = 0; i < auctionLeadMembers.length; i++) {
-            if (auctionLeadMembers[i] == adrs) {
-                return true;
-            }
+    event AuctionTimeOut(
+        uint id,
+        address seller
+    );
+
+    event AuctionCancelled(
+        uint id,
+        address seller
+    );
+
+    Counters.Counter private _id;
+    Auction[] private _auctions; 
+
+
+    // POC 개인이 임의로 옥션 생성할 수 있고, 동시에 여러 옥션이 진행되지 못 하게 기획이 정해졌다.
+    // 동시에 여러 옥션이 진행되지 못하므로, vault 도 이제 필요 없을 것 같다.
+    function createAuction(uint quantity) public returns (bool) {
+        bool isSold = true;
+        uint currentId = _id.current();
+        if (currentId > 0) {
+            isSold = _auctions[currentId - 1].isSold;
         }
-        return false;
-    }
+        require(isSold, "There is another pending auction.");
+        require(token.balanceOf(msg.sender) > 10, "You don't have enough POC for creating auction.");
+        require(quantity <= token.balanceOf(msg.sender) - 10, "You tried to create auction with too many quantity.");
 
-    function getTokenVault(address _address) public view returns (uint) {
-        return tokenVault[epoch][_address];
-    }
+        startPrice += _auctions[currentId - 1].currentPrice * 3; // 저번 팔린 가격 참고해서 startPrice 증가.
 
-    function setTokenVault(address _address, uint value) public returns (bool) {
-        token.transferFrom(_address, address(this), value);
-        tokenVault[epoch][_address] += value;
-        return true;
-    }
-
-
-    function createAuction(uint16 value, address auctionOwner, uint startPrice, uint updatePrice) public returns (bool) {
-        require(isLeadMembers(msg.sender));
-        require(value <= tokenVault[epoch][auctionOwner]);
-        require(startPrice * 1 ether >= 1 ether);
-        require(updatePrice * 100 <= startPrice);
-
-        auctions[epoch][auctionIndex] = Auction(auctionOwner, value, startPrice, startPrice, updatePrice, block.number, true);
-        tokenVault[epoch][auctionOwner] -= value;
-        auctionIndex += 1;
-        emit AuctionCreated(auctionOwner, value, startPrice, updatePrice, block.number);
+        Auction memory new_auction = Auction(currentId, msg.sender, quantity, startPrice, block.number, false);
+        _auctions.push(new_auction);
+        emit AuctionCreated(currentId, msg.sender, quantity, block.number);
+        _id.increment();
         return true;
     }
     
     // for updating front-end page 
-    function updateAuction() private returns (bool) {
-        for (uint16 i=0; i<auctionIndex; i++) {
-            Auction storage auction = auctions[epoch][i];
-            if (auction.isValid) {
-                if (block.number - auction.createdBlockNumber > 500) {
-                    auction.isValid = false;
-                }
-                else {
-                    uint newPrice = auction.currentPrice - SafeMath.div(block.number - auction.createdBlockNumber, 50) * auction.updatePrice; 
-                    auction.currentPrice = newPrice;
-                }
-            }
+    function updateAuction() public returns (bool) {
+        uint currentId = _id.current();
+        require(currentId > 0, "No auction has created.");
+        require(!_auctions[currentId - 1].isSold, "No auction has been pending.");
+        Auction memory auction = _auctions[currentId - 1];
+
+        if (block.number - auction.createdBlockNumber > 7200) {
+            auction.isSold = true; // time-out
+            auction.currentPrice = 0;
+            emit AuctionTimeOut(currentId, auction.seller);
+        } else {
+            uint newPrice = startPrice - (startPrice - minimumPrice) * SafeMath.div(block.number - auction.createdBlockNumber, 7200);
+            auction.currentPrice  = newPrice;
         }
         return true;
     }
 
-    function takeAuction(uint16 index) public payable returns (bool) {
-        // confirm the taking price.
-        Auction storage auction = auctions[epoch][index];
-        uint newPrice = auction.currentPrice - SafeMath.div(block.number - auction.createdBlockNumber, 50) * auction.updatePrice; 
-        auction.currentPrice = newPrice;
+    function takeAuction() public payable returns (bool) {
+        // accept the current price.
+        updateAuction(); // 혹시 모르니까 사기 전에 업데이트 한 번 더
+        uint currentId = _id.current();
+        Auction memory auction = _auctions[currentId - 1];
 
-        require(auction.isValid);
+        require(!auction.isSold, "There is no valid auction.");    
+        require(msg.sender != auction.seller, "You cannot buy your own auction.");    
         require(msg.value >= auction.currentPrice); // check ETH balance
-        require(token.balanceOf(msg.sender) >= 7);
+        require(token.balanceOf(msg.sender) >= 7, "You can buy POC only if you have more than 7 POC.");
 
-        auction.isValid = false;
+        auction.isSold = true;
+        // Maker gets {price} amount of Ethers from Taker.(Ethers: Taker → Maker)
         payable(auction.seller).transfer(auction.currentPrice);
-        // eth 보내줘야 함.
-        tokenVault[epoch][auction.seller] -= auction.value;
-        token.transfer(msg.sender, auction.value);
+
+        // approve 를 auction contract 에만 해줘야 한다.
+        IERC20(token).transferFrom(
+            auction.seller,
+            msg.sender,
+            auction.quantity
+        );
+        emit AuctionSold(
+            currentId, 
+            auction.seller, 
+            msg.sender, 
+            auction.quantity, 
+            auction.currentPrice, 
+            block.number - auction.createdBlockNumber);
 
         return true;
     }
 
-    function cancelAuction(uint16 index) public returns (bool) {
-        Auction storage auction = auctions[epoch][index];
-        require(isLeadMembers(msg.sender) || msg.sender == auction.seller);
-        auction.isValid = false;
-        tokenVault[epoch][auction.seller] -= auction.value;
-        token.transfer(auction.seller, auction.value);
+    function cancelAuction() public returns (bool) {
+        uint currentId = _id.current();
+        require(currentId > 0, "No auction has created.");
+        require(!_auctions[currentId - 1].isSold, "No auction has been pending.");
+        
+        Auction memory auction = _auctions[currentId - 1];
+        auction.isSold = true;
+        auction.currentPrice = 0;
+        emit AuctionCancelled(currentId, auction.seller);
         return true;
     }
 }

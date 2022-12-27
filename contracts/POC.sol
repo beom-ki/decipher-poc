@@ -3,12 +3,9 @@ pragma solidity >= 0.8.0;
 
 
 import "./extensions/ERC20Epochs.sol";
-import "./Dutch_Auction.sol";
 
 contract POC is ERC20Epochs {
-    constructor() ERC20Epochs("POC", "POC") {
-    }
-    DutchAuction dutch;
+    constructor() ERC20Epochs("POC", "POC") {}
 
     // Examples for POC(Proof of Contribution) specific logics.
     function decimals() public pure override returns (uint8) {
@@ -28,14 +25,10 @@ contract POC is ERC20Epochs {
     }
 
     function transfer(address to, uint256 amount) public virtual override returns (bool) {
-        // only can send to Auction contract or Lead member can send POC once someone fulfills the condition.
-        require(to == 0xd9145CCE52D386f254917e481eB44e9943F39138 || isLeadMembers(msg.sender)); 
+        // only Lead member can send POC once someone fulfills the condition.
+        require(isLeadMembers(msg.sender)); 
         address owner = msg.sender;
         _transfer(owner, to, amount);
-        if (to == 0xd9145CCE52D386f254917e481eB44e9943F39138) {
-            // 어차피 현재 epoch 상태의 토큰들만 이동 가능한 거인듯
-            dutch.setTokenVault(owner, amount);
-        }
         return true;
     }
 
@@ -44,7 +37,6 @@ contract POC is ERC20Epochs {
         address to,
         uint256 amount
     ) public virtual override returns (bool) {
-        require(isLeadMembers(msg.sender)); // only lead members can execute others token
         address spender = msg.sender;
         _spendAllowance(from, spender, amount);
         _transfer(from, to, amount);
