@@ -5,6 +5,7 @@ import "./POC.sol";
 import "@openzeppelin/contracts/utils/math/SafeMath.sol";
 import "@openzeppelin/contracts/utils/Counters.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "hardhat/console.sol";
 
 contract DutchAuction {
     using SafeMath for uint;
@@ -13,7 +14,7 @@ contract DutchAuction {
     uint public startPrice = 1e18; // 1eth
     uint public minimumPrice = 1e16; // 0.01eth
 
-
+    
     struct Auction {
         uint index;
         address seller;
@@ -54,6 +55,20 @@ contract DutchAuction {
     Counters.Counter private _id;
     Auction[] private _auctions; 
 
+    constructor(POC token_){
+        token = token_;
+    }
+
+    function seeHistoricalAuction(uint index) public view returns(Auction memory) {
+        require(index < _auctions.length, "Indexing error");
+        return _auctions[index];
+    }
+
+    function seeCurrentAuction() public view returns(Auction memory) {
+        require(_id.current() > 0, "No auction has been created");
+        return _auctions[_id.current() - 1];
+    }
+
 
     // POC 개인이 임의로 옥션 생성할 수 있고, 동시에 여러 옥션이 진행되지 못 하게 기획이 정해졌다.
     // 동시에 여러 옥션이 진행되지 못하므로, vault 도 이제 필요 없을 것 같다.
@@ -62,14 +77,12 @@ contract DutchAuction {
         uint currentId = _id.current();
         if (currentId > 0) {
             isSold = _auctions[currentId - 1].isSold;
+            startPrice += _auctions[currentId - 1].currentPrice * 3; // 저번 팔린 가격 참고해서 startPrice 증가.
         }
         require(isSold, "There is another pending auction.");
         require(token.balanceOf(msg.sender) > 10, "You don't have enough POC for creating auction.");
         require(quantity <= token.balanceOf(msg.sender) - 10, "You tried to create auction with too many quantity.");
 
-        startPrice += _auctions[currentId - 1].currentPrice * 3; // 저번 팔린 가격 참고해서 startPrice 증가.
-
-        token.approve(address(this), 5); // 최대 5개 팔 수 있음. -> 여기서 approve 해줘야 transferFrom 사용가능
         Auction memory new_auction = Auction(currentId, msg.sender, quantity, startPrice, block.number, false);
         _auctions.push(new_auction);
         emit AuctionCreated(currentId, msg.sender, quantity, block.number);
@@ -82,14 +95,16 @@ contract DutchAuction {
         uint currentId = _id.current();
         require(currentId > 0, "No auction has created.");
         require(!_auctions[currentId - 1].isSold, "No auction has been pending.");
-        Auction memory auction = _auctions[currentId - 1];
+        Auction storage auction = _auctions[currentId - 1]; // 값 업데이트 하려면 storage 써야 한다.
 
         if (block.number - auction.createdBlockNumber > 7200) {
             auction.isSold = true; // time-out
             auction.currentPrice = 0;
             emit AuctionTimeOut(currentId, auction.seller);
         } else {
-            uint newPrice = startPrice - (startPrice - minimumPrice) * SafeMath.div(block.number - auction.createdBlockNumber, 7200);
+            console.log(block.number);
+            uint newPrice = startPrice - SafeMath.div((startPrice - minimumPrice) * (block.number - auction.createdBlockNumber), 7200);
+            console.log(newPrice);
             auction.currentPrice  = newPrice;
         }
         return true;
@@ -99,23 +114,26 @@ contract DutchAuction {
         // accept the current price.
         updateAuction(); // 혹시 모르니까 사기 전에 업데이트 한 번 더
         uint currentId = _id.current();
-        Auction memory auction = _auctions[currentId - 1];
+        Auction storage auction = _auctions[currentId - 1];
 
         require(!auction.isSold, "There is no valid auction.");    
         require(msg.sender != auction.seller, "You cannot buy your own auction.");    
         require(msg.value >= auction.currentPrice); // check ETH balance
         require(token.balanceOf(msg.sender) >= 7, "You can buy POC only if you have more than 7 POC.");
 
-        auction.isSold = true;
         // Maker gets {price} amount of Ethers from Taker.(Ethers: Taker → Maker)
+        console.log(auction.currentPrice);
+        console.log(msg.value);
         payable(auction.seller).transfer(auction.currentPrice);
-
+        console.log("Succeed");
         // approve 를 auction contract 에만 해줘야 한다.
+        console.log(auction.quantity);
         token.transferFrom(
             auction.seller,
             msg.sender,
             auction.quantity
         );
+        auction.isSold = true;
         emit AuctionSold(
             currentId, 
             auction.seller, 
@@ -132,7 +150,7 @@ contract DutchAuction {
         require(currentId > 0, "No auction has created.");
         require(!_auctions[currentId - 1].isSold, "No auction has been pending.");
         
-        Auction memory auction = _auctions[currentId - 1];
+        Auction storage auction = _auctions[currentId - 1];
         auction.isSold = true;
         auction.currentPrice = 0;
         emit AuctionCancelled(currentId, auction.seller);
