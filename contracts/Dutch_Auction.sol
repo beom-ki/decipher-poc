@@ -5,7 +5,6 @@ import "./POC.sol";
 import "@openzeppelin/contracts/utils/math/SafeMath.sol";
 import "@openzeppelin/contracts/utils/Counters.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "hardhat/console.sol";
 
 contract DutchAuction {
     using SafeMath for uint;
@@ -102,9 +101,7 @@ contract DutchAuction {
             auction.currentPrice = 0;
             emit AuctionTimeOut(currentId, auction.seller);
         } else {
-            console.log(block.number);
             uint newPrice = startPrice - SafeMath.div((startPrice - minimumPrice) * (block.number - auction.createdBlockNumber), 7200);
-            console.log(newPrice);
             auction.currentPrice  = newPrice;
         }
         return true;
@@ -122,12 +119,8 @@ contract DutchAuction {
         require(token.balanceOf(msg.sender) >= 7, "You can buy POC only if you have more than 7 POC.");
 
         // Maker gets {price} amount of Ethers from Taker.(Ethers: Taker → Maker)
-        console.log(auction.currentPrice);
-        console.log(msg.value);
         payable(auction.seller).transfer(auction.currentPrice);
-        console.log("Succeed");
         // approve 를 auction contract 에만 해줘야 한다.
-        console.log(auction.quantity);
         token.transferFrom(
             auction.seller,
             msg.sender,
