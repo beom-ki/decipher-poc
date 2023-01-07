@@ -134,7 +134,11 @@ contract DutchAuction {
             auction.quantity, 
             auction.currentPrice, 
             block.number - auction.createdBlockNumber);
-
+            
+        // msg.value 가 가격보다 크면 남은 것 돌려주기
+        if (msg.value > auction.currentPrice) {
+            payable(msg.sender).transfer(msg.value - auction.currentPrice);
+        }
         return true;
     }
 
