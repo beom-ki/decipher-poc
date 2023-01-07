@@ -17,4 +17,4 @@ Remix localhost test done.
 
 ### ToDo / Discussion Agenda
 1. Auction contract approve 를 처음부터 다 해줘야 한다. (토큰 개발 파트에서 해결 가능?)
-2. msg.value 남은 거 돌려주는 코드 레퍼런스가 있나? (take 직전에 update 하기 때문에 정확히 현재 가격을 알 수가 없어서 이럴 경우에 어떻게 처리하나?)
+2. msg.value 남은 거 돌려주는 현재 방식이 옳은가? (take 직전에 update 하기 때문에 정확히 현재 가격을 알 수가 없어서 직전 업데이트 가격만큼 받아야 할 수 있다.)
