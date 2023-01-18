@@ -55,7 +55,10 @@ contract DutchAuction {
 
     Counters.Counter private _id;
     Auction[] private _auctions; 
-
+    
+    function auctionLength() public view returns(uint256) {
+        return _auctions.length;
+    }
 
     function getAuction(uint index) public view returns(Auction memory) {
         require(index < _auctions.length, "Indexing error");
