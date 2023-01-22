@@ -86,8 +86,12 @@ contract DutchAuction {
         currentAuction.buyer = msg.sender;
         currentAuction.updatedAt = block.number;
 
-        // POC Token: Seller → Buyer
-        // Ether: Buyer → Seller, and refund balance.
+        token.transferFrom(currentAuction.seller, msg.sender, currentAuction.quantity);
+
+        payable(currentAuction.seller).transfer(currentPrice);
+        if (msg.value > currentPrice) {
+            payable(msg.sender).transfer(msg.value - currentPrice);
+        }
 
         return true;
     }
