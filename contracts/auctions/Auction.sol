@@ -6,7 +6,7 @@ import "@openzeppelin/contracts/utils/Counters.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 
-contract POCAuction {
+abstract contract Auction {
     using Counters for Counters.Counter;
 
     event AuctionCreated(
@@ -24,7 +24,7 @@ contract POCAuction {
         Created,
         Ended
     }
-    struct Auction {
+    struct AuctionInformation {
         // Auction Basic Information
         // should updated at Created.
         uint id;
@@ -38,7 +38,7 @@ contract POCAuction {
     }
     
     Counters.Counter private _id;
-    Auction[] private _auctions;
+    AuctionInformation[] private _auctions;
 
     address public poc;
 
@@ -50,18 +50,18 @@ contract POCAuction {
         return _id.current();
     }
 
-    function getAuction() public view returns (Auction memory) {
+    function getAuction() public view returns (AuctionInformation memory) {
         return _auctions[_id.current() - 1];
     }
 
-    function getAuction(uint id) public view returns (Auction memory) {
+    function getAuction(uint id) public view returns (AuctionInformation memory) {
         return _auctions[id];
     }
 
     function createAuction() public returns (uint ) {
         uint currentId = _id.current();
 
-        Auction memory newAuction = Auction(
+        AuctionInformation memory newAuction = AuctionInformation(
             currentId,
             Status.Created,
             msg.sender,
@@ -77,7 +77,7 @@ contract POCAuction {
     }
 
     function closeAuction(uint id) public payable {
-        Auction storage auction = _auctions[id];
+        AuctionInformation storage auction = _auctions[id];
 
         // 1. Check conditions.
         require(auction.status != Status.Ended);
