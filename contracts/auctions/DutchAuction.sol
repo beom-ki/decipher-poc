@@ -1,10 +1,13 @@
 // SPDX-License-Identifier: MIT
 pragma solidity >= 0.8.0;
 
-import "./extensions/ERC20Epochs.sol";
+
+import "../tokens/extensions/ERC20Epochs.sol";
+
 import "@openzeppelin/contracts/utils/math/SafeMath.sol";
 import "@openzeppelin/contracts/utils/Counters.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+
 
 contract DutchAuction {
     using SafeMath for uint;

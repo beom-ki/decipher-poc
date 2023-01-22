@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity >= 0.8.0;
 
-import "./POC.sol";
+
+import "../tokens/POC.sol";
+
 
 contract EnglishAuction {
     POC token;
