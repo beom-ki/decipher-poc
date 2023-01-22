@@ -4,9 +4,15 @@ pragma solidity >= 0.8.0;
 
 import "./extensions/ERC20Epochs.sol";
 
+import "@openzeppelin/contracts/access/Ownable.sol";
 
-contract POC is ERC20Epochs {
-    constructor() ERC20Epochs("POC", "POC") {
+
+contract POC is ERC20Epochs, Ownable {
+    constructor() ERC20Epochs("Decipher POC", "POC") {
+    }
+
+    function mint(address account, uint256 amount) public onlyOwner {
+        _mint(account, amount);
     }
 
     // Examples for POC(Proof of Contribution) specific logics.
