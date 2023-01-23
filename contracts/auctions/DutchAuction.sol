@@ -66,7 +66,14 @@ contract DutchAuction {
         return _auctions[_id.current() - 1];
     }
 
-    function getPrice() public view returns (uint256) {
+    function getPrice() public virtual view returns (uint256) {
+        return _getPrice();
+    }
+
+    function _getPrice() internal virtual view returns (uint256) {
+        // The pricing model may be implemented differently depending on the situation.
+        // Default to "linear-decreasing" dutch auction.
+
         AuctionInformation memory currentAuction = getAuction();
         uint256 currentPrice = currentAuction.initialPrice * (duration - (block.number - currentAuction.createdAt))/duration;
         return currentPrice;
