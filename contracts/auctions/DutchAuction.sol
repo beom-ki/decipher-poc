@@ -2,9 +2,8 @@
 pragma solidity >= 0.8.0;
 
 
-import "./Auction.sol";
-
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/utils/Counters.sol";
 
 
 contract DutchAuction {
@@ -38,7 +37,6 @@ contract DutchAuction {
     constructor(address _tokenAddress, uint _duration) {
         token = IERC20(_tokenAddress);
         duration = _duration; 
-        // For example, Duration 7,200 means 1 Day/86,400s(average 12s/block) in average.
     }
 
     function createAuction(uint quantity, uint initialPrice) public returns (AuctionInformation memory) {
