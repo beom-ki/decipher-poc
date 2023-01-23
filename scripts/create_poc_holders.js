@@ -8,8 +8,8 @@ async function main() {
     const POC = await hre.ethers.getContractFactory("POC");
     const poc = await POC.attach(deployed.POC.address);
 
-    const Auction = await hre.ethers.getContractFactory("POCAuction");
-    const auction = await Auction.attach(deployed.POCAuction.address);
+    const Auction = await hre.ethers.getContractFactory("POCDutchAuction");
+    const auction = await Auction.attach(deployed.POCDutchAuction.address);
 
     signers.forEach(async (signer) => {
         const pocWithSigner = await poc.connect(signer);
