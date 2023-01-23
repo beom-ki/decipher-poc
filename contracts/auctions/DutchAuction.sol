@@ -55,9 +55,26 @@ contract DutchAuction {
         duration = _duration; 
     }
 
+    function getAuction(uint id) public virtual view returns (AuctionInformation memory) {
+        return _auctions[id];
+    }
+
+    function getAuction() public virtual view returns (AuctionInformation memory) {
+        // Returns current(last) auction.
+        return _auctions[_id.current() - 1];
+    }
+
     function createAuction(uint quantity, uint initialPrice) public virtual returns (AuctionInformation memory) {
         address seller = msg.sender;
         return _createAuction(seller, quantity, initialPrice);
+    }
+
+    function getPrice() public virtual view returns (uint256) {
+        return _getPrice();
+    }
+
+    function takeAuction() public virtual payable returns (bool) {
+        return _takeAuction(msg.sender, msg.value);
     }
 
     function _createAuction(address seller, uint quantity, uint initialPrice) internal virtual returns (AuctionInformation memory) {
@@ -90,19 +107,6 @@ contract DutchAuction {
         return auction;
     }
 
-    function getAuction(uint id) public virtual view returns (AuctionInformation memory) {
-        return _auctions[id];
-    }
-
-    function getAuction() public virtual view returns (AuctionInformation memory) {
-        // Returns current(last) auction.
-        return _auctions[_id.current() - 1];
-    }
-
-    function getPrice() public virtual view returns (uint256) {
-        return _getPrice();
-    }
-
     function _getPrice() internal virtual view returns (uint256) {
         // The pricing model may be implemented differently depending on the situation.
         // Default to "linear-decreasing" dutch auction.
@@ -110,10 +114,6 @@ contract DutchAuction {
         AuctionInformation memory currentAuction = getAuction();
         uint256 currentPrice = currentAuction.initialPrice * (duration - (block.number - currentAuction.createdAt))/duration;
         return currentPrice;
-    }
-
-    function takeAuction() public virtual payable returns (bool) {
-        return _takeAuction(msg.sender, msg.value);
     }
 
     function _takeAuction(address buyer, uint max_eth_sold) internal virtual returns (bool) {
