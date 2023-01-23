@@ -7,7 +7,7 @@ const main = async function (hre) {
     const {deployer} = await getNamedAccounts();
     const deployed = await hre.deployments.all();
 
-    await deployments.deploy('POCAuction', {
+    await deployments.deploy('POCDutchAuction', {
         from: deployer,
         args: [deployed.POC.address],
         log: true,
@@ -16,4 +16,4 @@ const main = async function (hre) {
 
 
 module.exports = main;
-main.tags = ["POCAuction"];
+main.tags = ["POCDutchAuction"];
