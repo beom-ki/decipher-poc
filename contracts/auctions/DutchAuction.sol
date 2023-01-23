@@ -9,10 +9,21 @@ import "@openzeppelin/contracts/utils/Counters.sol";
 contract DutchAuction {
     using Counters for Counters.Counter;
 
-    Counters.Counter private _id;
-    IERC20 public token;
-    AuctionInformation[] public _auctions;
-    uint256 public duration;
+    event AuctionCreated(
+        uint indexed id,
+        address indexed seller,
+        uint quantity,
+        uint initialPrice
+    );
+
+    event AuctionEnded(
+        uint indexed id,
+        address indexed seller,
+        uint quantity,
+        uint initialPrice,
+        address indexed buyer,
+        uint price
+    );
 
     enum Status {
         Created,
@@ -33,6 +44,11 @@ contract DutchAuction {
         uint256 price;
         uint256 updatedAt;
     }
+
+    Counters.Counter private _id;
+    IERC20 public token;
+    AuctionInformation[] public _auctions;
+    uint256 public duration;
 
     constructor(address _tokenAddress, uint _duration) {
         token = IERC20(_tokenAddress);
@@ -56,9 +72,17 @@ contract DutchAuction {
             0,
             block.number
         );
-
         _auctions.push(auction);
+
+        emit AuctionCreated(
+            _id.current(),
+            msg.sender,
+            quantity,
+            initialPrice
+        );
+
         _id.increment();
+
         return auction;
     }
 
@@ -97,6 +121,15 @@ contract DutchAuction {
         if (msg.value > currentPrice) {
             payable(msg.sender).transfer(msg.value - currentPrice);
         }
+
+        emit AuctionEnded(
+            currentAuction.id,
+            currentAuction.seller,
+            currentAuction.quantity,
+            currentAuction.initialPrice,
+            msg.sender,
+            currentPrice
+        );
 
         return true;
     }
