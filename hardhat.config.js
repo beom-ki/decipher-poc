@@ -22,4 +22,10 @@ module.exports = {
             default: 0,
         },
     },
+
+    verify: {
+        etherscan: {
+            apiKey: process.env.ETHERSCAN_API_KEY,
+        }
+    }
 };
