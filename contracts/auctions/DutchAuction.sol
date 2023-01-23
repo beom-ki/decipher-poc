@@ -112,23 +112,27 @@ contract DutchAuction {
         return currentPrice;
     }
 
-    function takeAuction() public payable returns (bool) {
+    function takeAuction() public virtual payable returns (bool) {
+        return _takeAuction(msg.sender, msg.value);
+    }
+
+    function _takeAuction(address buyer, uint max_eth_sold) internal virtual returns (bool) {
         AuctionInformation storage currentAuction = _auctions[_id.current() - 1];
         uint256 currentPrice = getPrice();
 
         require(currentAuction.status != Status.Ended);
-        require(msg.value >= currentPrice);
+        require(max_eth_sold >= currentPrice);
 
         currentAuction.price = currentPrice;
         currentAuction.status = Status.Ended;
-        currentAuction.buyer = msg.sender;
+        currentAuction.buyer = buyer;
         currentAuction.updatedAt = block.number;
 
-        token.transferFrom(currentAuction.seller, msg.sender, currentAuction.quantity);
+        token.transferFrom(currentAuction.seller, buyer, currentAuction.quantity);
 
         payable(currentAuction.seller).transfer(currentPrice);
-        if (msg.value > currentPrice) {
-            payable(msg.sender).transfer(msg.value - currentPrice);
+        if (max_eth_sold > currentPrice) {
+            payable(msg.sender).transfer(max_eth_sold - currentPrice);
         }
 
         emit AuctionEnded(
@@ -136,7 +140,7 @@ contract DutchAuction {
             currentAuction.seller,
             currentAuction.quantity,
             currentAuction.initialPrice,
-            msg.sender,
+            buyer,
             currentPrice
         );
 
