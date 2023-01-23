@@ -55,16 +55,20 @@ contract DutchAuction {
         duration = _duration; 
     }
 
-    function createAuction(uint quantity, uint initialPrice) public returns (AuctionInformation memory) {
+    function createAuction(uint quantity, uint initialPrice) public virtual returns (AuctionInformation memory) {
+        address seller = msg.sender;
+        return _createAuction(seller, quantity, initialPrice);
+    }
+
+    function _createAuction(address seller, uint quantity, uint initialPrice) internal virtual returns (AuctionInformation memory) {
         require(
             _id.current() == 0 || _auctions[_id.current() - 1].status == Status.Ended,
             "Auction: Auction creation is only available one at a time."
         );
-        
         AuctionInformation memory auction = AuctionInformation(
             _id.current(),
             Status.Created,
-            msg.sender,
+            seller,
             quantity,
             block.number,
             initialPrice,
@@ -86,7 +90,12 @@ contract DutchAuction {
         return auction;
     }
 
-    function getAuction() public view returns (AuctionInformation memory) {
+    function getAuction(uint id) public virtual view returns (AuctionInformation memory) {
+        return _auctions[id];
+    }
+
+    function getAuction() public virtual view returns (AuctionInformation memory) {
+        // Returns current(last) auction.
         return _auctions[_id.current() - 1];
     }
 
